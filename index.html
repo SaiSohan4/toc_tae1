@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>NFA Traversal Engine</title>
+  <meta name="description" content="Theory of Computation: simulate a nondeterministic finite automaton with parallel-path tracking or backtracking, step by step.">
+  <meta name="theme-color" content="#0b1020">
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="NFA Engine">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <img src="icons/icon-192.png" alt="" width="40" height="40">
+    <div>
+      <h1>NFA Traversal Engine</h1>
+      <p>Theory of Computation &middot; parallel-path &amp; backtracking simulator</p>
+    </div>
+  </div>
+  <button id="installBtn" class="btn ghost" hidden>&#11015; Install app</button>
+</header>
+
+<main class="layout">
+
+  <!-- ============ LEFT: machine definition ============ -->
+  <section class="card machine" aria-labelledby="h-machine">
+    <h2 id="h-machine"><span class="num">1</span> Define the NFA <button id="toggleMachine" class="btn ghost tog" type="button" aria-expanded="true">Hide editor ▴</button></h2>
+
+    <label class="field">
+      <span>Preset</span>
+      <select id="preset"></select>
+    </label>
+    <p id="presetDesc" class="muted small"></p>
+
+    <div id="machineBody">
+    <label class="field">
+      <span>States <em>Q</em></span>
+      <input id="fStates" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="q0, q1, q2">
+    </label>
+
+    <label class="field">
+      <span>Alphabet <em>&Sigma;</em> (single characters)</span>
+      <input id="fAlpha" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="0, 1">
+    </label>
+
+    <div class="row2">
+      <label class="field">
+        <span>Start state <em>q&#8320;</em></span>
+        <input id="fStart" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="q0">
+      </label>
+      <label class="field">
+        <span>Accepting <em>F</em></span>
+        <input id="fAccept" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="q2">
+      </label>
+    </div>
+
+    <label class="field">
+      <span>Transitions <em>&delta;</em></span>
+      <textarea id="fTrans" rows="9" autocomplete="off" autocapitalize="off" spellcheck="false"
+        placeholder="q0, 0 -> q0, q1&#10;q0, 1 -> q0&#10;q1, 1 -> q2"></textarea>
+    </label>
+    <p class="hint small">
+      One rule per line: <code>state, symbol -&gt; target1, target2</code><br>
+      Write <code>eps</code> (or <code>&epsilon;</code>) for an &epsilon;-move. Lines starting with <code>//</code> are comments.
+    </p>
+
+    <div id="machineErrors" class="errors" role="alert" hidden></div>
+
+    <div class="btnrow">
+      <button id="applyBtn" class="btn primary">Apply machine</button>
+      <button id="resetBtn" class="btn ghost">Reset preset</button>
+    </div>
+
+    </div>
+
+    <div id="formal" class="formal small mono"></div>
+  </section>
+
+  <!-- ============ RIGHT: graph, run, trace ============ -->
+  <div class="stack">
+
+    <section class="card" aria-labelledby="h-graph">
+      <h2 id="h-graph"><span class="num">2</span> Transition graph</h2>
+      <div id="graphWrap" class="graphwrap" aria-live="polite"></div>
+      <ul class="legend small">
+        <li><i class="dot d-active"></i> active state</li>
+        <li><i class="dot d-trail"></i> on current path</li>
+        <li><i class="dot d-accept"></i> accepting (double ring)</li>
+        <li><i class="dot d-win"></i> accepted</li>
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="h-run">
+      <h2 id="h-run"><span class="num">3</span> Run a string</h2>
+
+      <div class="inputrow">
+        <input id="inputStr" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="type a string &mdash; empty means &epsilon;" aria-label="Input string">
+        <button id="runBtn" class="btn primary">Run &#9654;</button>
+      </div>
+      <div id="examples" class="chips" aria-label="Example strings"></div>
+
+      <div class="seg" role="group" aria-label="Simulation algorithm">
+        <button id="modePar" class="on" type="button">Parallel paths</button>
+        <button id="modeBt" type="button">Backtracking</button>
+      </div>
+      <p id="modeDesc" class="muted small"></p>
+
+      <div id="banner" class="banner" hidden></div>
+
+      <div id="tape" class="tape" aria-label="Input tape"></div>
+
+      <div class="controls">
+        <button id="btnFirst" class="btn icon" title="First step" aria-label="First step">&#9198;</button>
+        <button id="btnPrev"  class="btn icon" title="Previous step (&larr;)" aria-label="Previous step">&#9664;</button>
+        <button id="btnPlay"  class="btn icon accent" title="Play / pause" aria-label="Play or pause">&#9654;</button>
+        <button id="btnNext"  class="btn icon" title="Next step (&rarr;)" aria-label="Next step">&#9654;&#65038;</button>
+        <button id="btnLast"  class="btn icon" title="Last step" aria-label="Last step">&#9197;</button>
+        <label class="speed small">
+          <span>Speed</span>
+          <select id="speed">
+            <option value="1500">Slow</option>
+            <option value="900" selected>Normal</option>
+            <option value="450">Fast</option>
+            <option value="180">Blazing</option>
+          </select>
+        </label>
+        <span id="stepLabel" class="steplabel small mono">&ndash;</span>
+      </div>
+
+      <div id="explain" class="explain" aria-live="polite">
+        <p class="muted">Press <b>Run</b> to start the simulation.</p>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-trace">
+      <h2 id="h-trace"><span class="num">4</span> Trace <small id="traceCount" class="muted"></small></h2>
+      <div id="trace" class="trace" role="list"></div>
+    </section>
+
+    <details class="card theory">
+      <summary>How the engine works</summary>
+      <div class="theory-body small">
+        <p><b>Formal model.</b> An NFA is a 5-tuple <code>N = (Q, &Sigma;, &delta;, q&#8320;, F)</code> where
+        <code>&delta; : Q &times; (&Sigma; &cup; {&epsilon;}) &rarr; P(Q)</code> returns a <em>set</em> of next states.
+        A string <code>w</code> is accepted iff <em>some</em> sequence of choices consumes all of <code>w</code> and ends in a state of <code>F</code>.</p>
+
+        <p><b>Parallel-path simulation</b> (the subset idea). Keep the set <code>S</code> of every state the machine could be in.
+        Start with <code>S = ECLOSE({q&#8320;})</code>. For each symbol <code>a</code>:
+        <code>S &larr; ECLOSE( &cup;<sub>s&isin;S</sub> &delta;(s, a) )</code>. Accept iff <code>S &cap; F &ne; &empty;</code>.
+        Time <code>O(n &middot; (|Q| + |&delta;|))</code> for a string of length <code>n</code>; space <code>O(|Q|)</code>.
+        If <code>S</code> ever becomes empty, every thread has died and the string is rejected.</p>
+
+        <p><b>Backtracking simulation.</b> Depth-first search over <em>configurations</em> <code>(state, position)</code>.
+        Take one option, go as deep as possible, and when stuck undo the last choice and try the next one.
+        Stop at the first accepting path. Two guards keep it finite: an <code>&epsilon;</code>-cycle check
+        (a configuration already on the current path is skipped) and a memo of configurations already proven to fail.
+        Without the memo, backtracking can take exponential time &mdash; try the <i>third symbol from the end is 1</i> preset on a long string.</p>
+
+        <p>Both methods always agree on the answer; the app runs both and tells you if they ever differ.</p>
+      </div>
+    </details>
+
+  </div>
+</main>
+
+<footer class="foot small muted">
+  <span id="netState">Online</span> &middot; Works offline once installed &middot; NFA Traversal Engine
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
